@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "aes_utils.h": "c",
+        "stdint.h": "c"
+    }
+}
