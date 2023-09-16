@@ -28,14 +28,13 @@ uint32_t RotWord (uint32_t value) {
 
 //This will apply SubWord to a size 4 array of 1 byte chunks
 //This represents basically a single word from the key
-//Least horrible way of doing this and kinda safe ig
 uint32_t SubWord(uint32_t inputKey, uint8_t sbox[256]){
    uint32_t reconstructedWord = 0;
     for (int i = 0; i < 4; i++) {
         // Extract the current byte (uint8_t) from the 32-bit word
         uint8_t currentByte = (uint8_t)(inputKey >> (24 - (i * 8)));
 
-        // Apply your function to the current byte
+        // Apply sbox mapping to the current byte
         currentByte = sbox[currentByte];
 
         // Reconstruct the uint32_t with the modified byte
@@ -45,8 +44,7 @@ uint32_t SubWord(uint32_t inputKey, uint8_t sbox[256]){
 }
 
 //This will now perform the whole KeyExpansion using the function defined previously
-//The imput would be an input of 16 bytes since there are 4 32-bit words. 4* 4bytes = 16 bytes
-//This will now perform the whole KeyExpansion using the function defined previously
+//This generates the round keys
 uint32_t* keyExpansion(uint32_t* ogKey){
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
@@ -67,6 +65,29 @@ uint32_t* keyExpansion(uint32_t* ogKey){
     return expandedKey;
 }
 
+//Defining the 4x4 state array for bytes
+typedef uint8_t Matrix4x4[4][4];
+
+//This changes the first 
+void AddRoundKey(uint32_t* roundKeys, Matrix4x4 matrix){
+    for (int j = 0; j < 4; j++){
+        uint32_t reconstructedWord = 0;
+        for (int i = 0; i < 4; i++) {
+            // Extract the current byte (uint8_t) from the ith word of the expanded round key
+            uint8_t currentByte = (uint8_t)(roundKeys[j] >> (24 - (i * 8)));
+
+            // Apply bitwise XOR between expaded round key
+            currentByte = currentByte ^ matrix[i][j];
+
+            // Reconstruct the uint32_t with the modified byte
+            reconstructedWord |= (uint32_t)currentByte << (24 - (i * 8));
+
+        }
+        roundKeys[j] = reconstructedWord; 
+    }
+}
+
+
 // Function to print a 1D uint32_t array
 void printArray(uint32_t* arr, int size) {
     for (int i = 0; i < size; i++) {
@@ -75,6 +96,8 @@ void printArray(uint32_t* arr, int size) {
     printf("\n");
 }
 
+//Currently this is used for testing purposes.
+//This will be used to do all encrpytion later on
 int main() {
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
@@ -87,6 +110,19 @@ int main() {
     uint32_t* expandedKey = keyExpansion(ogKey);
     printf("Expanded Key:\n");
     printArray(expandedKey, 4 * R);
+
+    Matrix4x4 state = {
+        {0x01, 0x02, 0x03, 0x04},
+        {0x05, 0x06, 0x07, 0x08},
+        {0x09, 0x0A, 0x0B, 0x0C},
+        {0x0D, 0x0E, 0x0F, 0x10}
+    };
+    AddRoundKey(expandedKey, state);
+    printf("Expanded Key (AddRoundKey):\n");
+    printArray(expandedKey, 4 * R);
+
     free(expandedKey);
     return 0;
+
+    
 }
