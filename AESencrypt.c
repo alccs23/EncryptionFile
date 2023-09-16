@@ -22,8 +22,8 @@ int N = 4;
 int R = 11;
 
 // Function to perform a one-byte left circular shift
-uint32_t RotWord (uint32_t value) {
-    return value << 8 | value >> (32 - 8);
+uint32_t RotWord (uint32_t value, unsigned int count) {
+    return value << count | value >> (32 - count);
 }
 
 //This will apply SubWord to a size 4 array of 1 byte chunks
@@ -55,7 +55,7 @@ uint32_t* keyExpansion(uint32_t* ogKey){
         if (i < N){
             expandedKey[i] = ogKey[i];
         } else if (i >= N && (i % N == 0 % N)){
-            expandedKey[i] = expandedKey[i-N] ^ SubWord(RotWord(expandedKey[i-1]), sbox) ^ Rcon[i/N];
+            expandedKey[i] = expandedKey[i-N] ^ SubWord(RotWord(expandedKey[i-1], 8), sbox) ^ Rcon[i/N];
         } else if (i >= N && N > 6 && (i % N == 4 % N)){
             expandedKey[i] = expandedKey[i-N] ^ SubWord(expandedKey[i-1],sbox);
         } else{
@@ -87,6 +87,42 @@ void AddRoundKey(uint32_t* roundKeys, Matrix4x4 matrix){
     }
 }
 
+//The subbytes step of AES encryption
+//This just modifies the matrix
+void SubBytes(Matrix4x4 matrix, uint8_t sbox[256]){
+    for (int j = 0; j < 4; j++){
+        for (int i = 0; i < 4; i++) {
+            matrix[i][j] = sbox[matrix[i][j]];
+        }
+    }
+}
+    
+//ShiftRows step of AES-128 encrpytion
+void shiftRows(Matrix4x4 state) {
+    uint8_t temp;
+
+    // Shift the second row one position to the left (circular shift)
+    temp = state[1][0];
+    state[1][0] = state[1][1];
+    state[1][1] = state[1][2];
+    state[1][2] = state[1][3];
+    state[1][3] = temp;
+
+    // Shift the third row two positions to the left (circular shift)
+    temp = state[2][0];
+    state[2][0] = state[2][2];
+    state[2][2] = temp;
+    temp = state[2][1];
+    state[2][1] = state[2][3];
+    state[2][3] = temp;
+
+    // Shift the fourth row three positions to the left (circular shift)
+    temp = state[3][0];
+    state[3][0] = state[3][3];
+    state[3][3] = state[3][2];
+    state[3][2] = state[3][1];
+    state[3][1] = temp;
+}
 
 // Function to print a 1D uint32_t array
 void printArray(uint32_t* arr, int size) {
@@ -96,12 +132,23 @@ void printArray(uint32_t* arr, int size) {
     printf("\n");
 }
 
+//Nice helper function to visualize state matrix
+void printMatrix(Matrix4x4 state){
+     for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            // Use %02X to format each element as a two-digit hexadecimal number
+            printf("%02X ", state[i][j]);
+        }
+        printf("\n"); // Start a new line for the next row
+    }
+}
+
 //Currently this is used for testing purposes.
 //This will be used to do all encrpytion later on
 int main() {
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
-    uint32_t word = RotWord(0x11223344);
+    uint32_t word = RotWord(0x11223344, 8);
     uint32_t word2 = SubWord(0x11223344, sbox);
     printf("RotWord word: 0x%X\n", word);
     printf("SubWord word: 0x%X\n", word2);
@@ -120,6 +167,15 @@ int main() {
     AddRoundKey(expandedKey, state);
     printf("Expanded Key (AddRoundKey):\n");
     printArray(expandedKey, 4 * R);
+
+    SubBytes(state, sbox);
+    printf("SubBytes States:\n");
+    printMatrix(state);
+    shiftRows(state);
+    printf("ShiftRows States:\n");
+    printMatrix(state);
+    
+
 
     free(expandedKey);
     return 0;
