@@ -8,9 +8,11 @@
 // Number of rounds for AES-128
 #define AES_ROUNDS 10
 
-
+//Defining the 4x4 state array for bytes
+typedef uint8_t Matrix4x4[4][4];
 
 // AES-128 round constants
+//The index at 0 is a placeholder, because SubWord works an 1 index. The placeholder will never be called
 const uint32_t Rcon[AES_ROUNDS+1] = {
     0x00000000, 0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1B000000, 0x36000000
 };
@@ -65,8 +67,7 @@ uint32_t* keyExpansion(uint32_t* ogKey){
     return expandedKey;
 }
 
-//Defining the 4x4 state array for bytes
-typedef uint8_t Matrix4x4[4][4];
+
 
 //This changes the first 
 void AddRoundKey(uint32_t* roundKeys, Matrix4x4 matrix){
@@ -124,6 +125,39 @@ void shiftRows(Matrix4x4 state) {
     state[3][1] = temp;
 }
 
+//This implements the galois multiplication needed
+//to implement the matrix multiplication of Rijndael MixColumns
+uint8_t GalMul(uint8_t input, int factor) {
+    uint8_t highBit = (input >> 7) & 1;
+    uint8_t temp = input << 1;
+    
+    if (factor == 3) {
+        temp ^= input;
+    }
+    
+    temp ^= highBit * 0x1B;
+    
+    return temp;
+}
+
+//Function that does MixColumns step
+void MixColumns(Matrix4x4 state){
+    uint8_t temp1;  
+    uint8_t temp2;
+    uint8_t temp3;
+    uint8_t temp4;     
+        for(int j = 0; j < 4; j++){
+            temp1 = (GalMul(state[0][j],2)) ^ (GalMul(state[1][j],3)) ^ state[2][j] ^ state[3][j];
+            temp2 = state[0][j] ^ (GalMul(state[1][j],2)) ^ (GalMul(state[2][j],3)) ^ state[3][j];
+            temp3 = state[0][j] ^ state[1][j] ^ (GalMul(state[2][j],2)) ^ (GalMul(state[3][j],3));
+            temp4 = (GalMul(state[0][j],3)) ^ state[1][j] ^ state[2][j] ^ (GalMul(state[3][j],2));
+            state[0][j] = temp1;
+            state[1][j] = temp2;
+            state[2][j] = temp3;
+            state[3][j] = temp4;
+    }
+}
+
 // Function to print a 1D uint32_t array
 void printArray(uint32_t* arr, int size) {
     for (int i = 0; i < size; i++) {
@@ -145,7 +179,7 @@ void printMatrix(Matrix4x4 state){
 
 //Currently this is used for testing purposes.
 //This will be used to do all encrpytion later on
-int main() {
+void tests() {
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
     uint32_t word = RotWord(0x11223344, 8);
@@ -174,11 +208,81 @@ int main() {
     shiftRows(state);
     printf("ShiftRows States:\n");
     printMatrix(state);
-    
+    Matrix4x4 mixTest = {
+        {0xdb, 0xf2, 0x01, 0x2d},
+        {0x13, 0x0a, 0x01, 0x26},
+        {0x53, 0x22, 0x01, 0x31},
+        {0x45, 0x5c, 0x01, 0x4c}
+    };
+    MixColumns(mixTest);
+    printf("MixColumns test:\n");
+    printMatrix(mixTest);
 
 
     free(expandedKey);
-    return 0;
+}
 
+void AddKeyHelper(Matrix4x4 state, uint32_t* RKeys, int statei, int keyi){
+    uint32_t combinedValue = 0;
+
+    // Iterate through each byte in the arrays and combine them
+    combinedValue |= ((uint32_t)state[0][statei] << 24); // Shift the first byte to the leftmost position
+    combinedValue |= ((uint32_t)state[1][statei] << 16); // Shift the second byte to the second leftmost position
+    combinedValue |= ((uint32_t)state[2][statei] << 8);  // Shift the third byte to the third leftmost position
+    combinedValue |= (uint32_t)state[3][statei];
     
+    // Combine the fourth byte as is
+    combinedValue ^= RKeys[keyi];
+
+    state[0][statei] = (uint8_t)(combinedValue >> 24); // Extract the first byte
+    state[1][statei] = (uint8_t)(combinedValue >> 16); // Extract the second byte
+    state[2][statei] = (uint8_t)(combinedValue >> 8);  // Extract the third byte
+    state[3][statei] = (uint8_t)combinedValue;         // Extract the fourth byte
+    }
+
+void AESdncrypt(Matrix4x4 state, uint32_t* RKeys){
+    printMatrix(state);
+    uint8_t sbox[256];
+    initialize_aes_sbox(sbox);
+    uint32_t* expandedKey = keyExpansion(RKeys);
+    printArray(expandedKey, 4 * R);
+    //This will add the original state to the first 4 bytes of the round keys
+    for (int i = 0; i < 4; i++){
+        AddKeyHelper(state, expandedKey, i, i);
+    }
+    //These will be the 9 round that are described by the AES Encrpytion Algorithm
+    for (int i = 1; i < 10; i++){
+        SubBytes(state, sbox);
+        shiftRows(state);
+        MixColumns(state);
+        printf("%u\n", i);
+        printMatrix(state);
+        printf("%u\n", i);
+        for (int j = 0; j < 4; j++){
+            AddKeyHelper(state, expandedKey, j, (i*4)+j);
+        }
+        printf("%u\n", i);
+        printMatrix(state);
+        printf("%u\n", i);
+    }
+    SubBytes(state,sbox);
+    shiftRows(state);
+    for (int i = 0; i < 4; i++){
+        AddKeyHelper(state, expandedKey, i, 40+i);
+    }
+    printMatrix(state);
+    free(expandedKey);
+}
+
+
+int main(){
+    Matrix4x4 state = {
+        {0x00, 0x03, 0x0f, 0x3f},
+        {0x00, 0x03, 0x0f, 0x3f},
+        {0x01, 0x07, 0x1f, 0x7f},
+        {0x01, 0x07, 0x1f, 0x7f}
+    };
+    uint32_t ogKey[4] = {0x00000000, 0x00000000, 0x00000000, 0x00000000};
+    AESdncrypt(state, ogKey);
+    return 0;
 }
