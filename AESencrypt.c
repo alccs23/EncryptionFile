@@ -47,11 +47,15 @@ uint32_t SubWord(uint32_t inputKey, uint8_t sbox[256]){
 
 //This will now perform the whole KeyExpansion using the function defined previously
 //This generates the round keys
-uint32_t* keyExpansion(uint32_t* ogKey){
+uint32_t* keyExpansion(uint32_t *ogKey) {
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
     // Allocate memory for the expanded array
-    uint32_t* expandedKey = (uint32_t*)malloc(4*R);
+    uint32_t *expandedKey = (uint32_t *)malloc(4 * R * sizeof(uint32_t));
+    if (expandedKey == NULL) {
+        perror("Memory allocation failed");
+        exit(1);
+    }
     //Using the rule to fill W_i in expandedKey
     for(int i = 0; i < 4* R; i++){
         if (i < N){
@@ -70,7 +74,7 @@ uint32_t* keyExpansion(uint32_t* ogKey){
 
 
 //This changes the first 
-void AddRoundKey(uint32_t* roundKeys, Matrix4x4 matrix){
+void AddRoundKey(uint32_t *roundKeys, uint8_t matrix[4][4]){
     for (int j = 0; j < 4; j++){
         uint32_t reconstructedWord = 0;
         for (int i = 0; i < 4; i++) {
@@ -90,7 +94,7 @@ void AddRoundKey(uint32_t* roundKeys, Matrix4x4 matrix){
 
 //The subbytes step of AES encryption
 //This just modifies the matrix
-void SubBytes(Matrix4x4 matrix, uint8_t sbox[256]){
+void SubBytes(uint8_t matrix[4][4], uint8_t sbox[256]){
     for (int j = 0; j < 4; j++){
         for (int i = 0; i < 4; i++) {
             matrix[i][j] = sbox[matrix[i][j]];
@@ -99,7 +103,7 @@ void SubBytes(Matrix4x4 matrix, uint8_t sbox[256]){
 }
     
 //ShiftRows step of AES-128 encrpytion
-void shiftRows(Matrix4x4 state) {
+void shiftRows(uint8_t state[4][4]) {
     uint8_t temp;
 
     // Shift the second row one position to the left (circular shift)
@@ -159,7 +163,7 @@ void MixColumns(Matrix4x4 state){
 }
 
 // Function to print a 1D uint32_t array
-void printArray(uint32_t* arr, int size) {
+void printArray(uint32_t *arr, int size) {
     for (int i = 0; i < size; i++) {
         printf("%08x ", arr[i]);
     }
@@ -167,7 +171,7 @@ void printArray(uint32_t* arr, int size) {
 }
 
 //Nice helper function to visualize state matrix
-void printMatrix(Matrix4x4 state){
+void printMatrix(uint8_t (*state)[4]){
      for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             // Use %02X to format each element as a two-digit hexadecimal number
@@ -192,7 +196,7 @@ void tests() {
     printf("Expanded Key:\n");
     printArray(expandedKey, 4 * R);
 
-    Matrix4x4 state = {
+    uint8_t state[4][4] = {
         {0x01, 0x02, 0x03, 0x04},
         {0x05, 0x06, 0x07, 0x08},
         {0x09, 0x0A, 0x0B, 0x0C},
@@ -208,7 +212,7 @@ void tests() {
     shiftRows(state);
     printf("ShiftRows States:\n");
     printMatrix(state);
-    Matrix4x4 mixTest = {
+    uint8_t mixTest[4][4] = {
         {0xdb, 0xf2, 0x01, 0x2d},
         {0x13, 0x0a, 0x01, 0x26},
         {0x53, 0x22, 0x01, 0x31},
@@ -217,14 +221,10 @@ void tests() {
     MixColumns(mixTest);
     printf("MixColumns test:\n");
     printMatrix(mixTest);
-
-
-    free(expandedKey);
 }
 
-void AddKeyHelper(Matrix4x4 state, uint32_t* RKeys, int statei, int keyi){
+void AddKeyHelper(uint8_t state[4][4], uint32_t *RKeys, int statei, int keyi){
     uint32_t combinedValue = 0;
-
     // Iterate through each byte in the arrays and combine them
     combinedValue |= ((uint32_t)state[0][statei] << 24); // Shift the first byte to the leftmost position
     combinedValue |= ((uint32_t)state[1][statei] << 16); // Shift the second byte to the second leftmost position
@@ -241,11 +241,9 @@ void AddKeyHelper(Matrix4x4 state, uint32_t* RKeys, int statei, int keyi){
     }
 
 void AESdncrypt(Matrix4x4 state, uint32_t* RKeys){
-    printMatrix(state);
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
     uint32_t* expandedKey = keyExpansion(RKeys);
-    printArray(expandedKey, 4 * R);
     //This will add the original state to the first 4 bytes of the round keys
     for (int i = 0; i < 4; i++){
         AddKeyHelper(state, expandedKey, i, i);
@@ -255,34 +253,28 @@ void AESdncrypt(Matrix4x4 state, uint32_t* RKeys){
         SubBytes(state, sbox);
         shiftRows(state);
         MixColumns(state);
-        printf("%u\n", i);
-        printMatrix(state);
-        printf("%u\n", i);
         for (int j = 0; j < 4; j++){
             AddKeyHelper(state, expandedKey, j, (i*4)+j);
         }
-        printf("%u\n", i);
-        printMatrix(state);
-        printf("%u\n", i);
     }
     SubBytes(state,sbox);
     shiftRows(state);
     for (int i = 0; i < 4; i++){
         AddKeyHelper(state, expandedKey, i, 40+i);
     }
-    printMatrix(state);
-    free(expandedKey);
 }
 
 
+
 int main(){
-    Matrix4x4 state = {
+    uint8_t state1[4][4] = {
         {0x00, 0x03, 0x0f, 0x3f},
         {0x00, 0x03, 0x0f, 0x3f},
         {0x01, 0x07, 0x1f, 0x7f},
         {0x01, 0x07, 0x1f, 0x7f}
     };
     uint32_t ogKey[4] = {0x00000000, 0x00000000, 0x00000000, 0x00000000};
-    AESdncrypt(state, ogKey);
+    AESdncrypt(state1, ogKey);
+    printMatrix(state1);
     return 0;
 }
