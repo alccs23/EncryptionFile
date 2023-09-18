@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdint.h>
+#include <string.h>
+#include <inttypes.h>
 #include "aes_utils.h"
 
 // Number of rounds for AES-128
@@ -240,9 +242,7 @@ void AddKeyHelper(uint8_t state[4][4], uint32_t *RKeys, int statei, int keyi){
     state[3][statei] = (uint8_t)combinedValue;         // Extract the fourth byte
     }
 
-void AESdncrypt(Matrix4x4 state, uint32_t* RKeys){
-    uint8_t sbox[256];
-    initialize_aes_sbox(sbox);
+void AESencrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t sbox[256]){
     uint32_t* expandedKey = keyExpansion(RKeys);
     //This will add the original state to the first 4 bytes of the round keys
     for (int i = 0; i < 4; i++){
@@ -266,15 +266,47 @@ void AESdncrypt(Matrix4x4 state, uint32_t* RKeys){
 
 
 
-int main(){
-    uint8_t state1[4][4] = {
-        {0x00, 0x03, 0x0f, 0x3f},
-        {0x00, 0x03, 0x0f, 0x3f},
-        {0x01, 0x07, 0x1f, 0x7f},
-        {0x01, 0x07, 0x1f, 0x7f}
-    };
-    uint32_t ogKey[4] = {0x00000000, 0x00000000, 0x00000000, 0x00000000};
-    AESdncrypt(state1, ogKey);
-    printMatrix(state1);
-    return 0;
+int main() {
+    uint8_t sbox[256];
+    initialize_aes_sbox(sbox);
+    char hexInput[33];  // Room for 32 hex characters plus null terminator
+    uint8_t state[4][4];
+
+    printf("Enter a 128-bit plaintext input (32 characters): ");
+    if (scanf("%32s", hexInput) != 1) {
+        fprintf(stderr, "Error reading input.\n");
+        return 1;
+    }
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            char hexByte[3];
+            hexByte[0] = hexInput[(j * 4 + i) * 2];
+            hexByte[1] = hexInput[(j * 4 + i) * 2 + 1];
+            hexByte[2] = '\0';
+
+            sscanf(hexByte, "%hhx", &state[i][j]);
+        }
+    }
+
+    char keyInput[33];  // 32 characters for the 128-bit hex + 1 for null terminator
+    uint32_t result[4];
+     printf("Enter a 128-bit key input (32 characters): ");
+    if (scanf("%32s", keyInput) != 1) {
+        fprintf(stderr, "Error reading input.\n");
+        return 1;
+    }
+    for (int i = 0; i < 4; i++) {
+        sscanf(keyInput + i * 8,"%hhx", &result[i]);
+    }
+    AESencrypt(state, result, sbox);
+    for (int j = 0; j < 4; j++) {
+        for (int i = 0; i < 4; i++) {
+            printf("%02X", state[i][j]);
+        }
+    }
+
+    printf("\n");
+
+    return 0; // Exit with success
 }
