@@ -186,7 +186,7 @@ void printMatrix(uint8_t (*state)[4]){
 //Currently this is used for testing purposes.
 //This will be used to do all encrpytion later on
 void tests() {
-    uint8_t sbox[256];
+    /*uint8_t sbox[256];
     initialize_aes_sbox(sbox);
     uint32_t word = RotWord(0x11223344, 8);
     uint32_t word2 = SubWord(0x11223344, sbox);
@@ -222,53 +222,71 @@ void tests() {
     };
     MixColumns(mixTest);
     printf("MixColumns test:\n");
-    printMatrix(mixTest);
+    printMatrix(mixTest);*/
+    uint32_t ogKey[4] = {0x00010203,0x04050607,0x08090a0b0,0x0c0d0e0f};
+    uint32_t* RKeys = ogKey;
+    uint32_t* expandedKey = keyExpansion(RKeys);
+    printf("Expanded Key:\n");
+    printArray(expandedKey, 4 * R);
 }
 
-void AddKeyHelper(uint8_t state[4][4], uint32_t *RKeys, int statei, int keyi){
-    uint32_t combinedValue = 0;
-    // Iterate through each byte in the arrays and combine them
-    combinedValue |= ((uint32_t)state[0][statei] << 24); // Shift the first byte to the leftmost position
-    combinedValue |= ((uint32_t)state[1][statei] << 16); // Shift the second byte to the second leftmost position
-    combinedValue |= ((uint32_t)state[2][statei] << 8);  // Shift the third byte to the third leftmost position
-    combinedValue |= (uint32_t)state[3][statei];
-    
-    // Combine the fourth byte as is
-    combinedValue ^= RKeys[keyi];
+void AddKeyHelper(uint8_t state[4][4], uint32_t *hexValue, int start){
+    for(int i = 0; i < 4; i++){
+            // Extract the first 8 bits (bits 31-24)
+            uint32_t first8Bits = (hexValue[i+(4*start)] >> 24) & 0xFF;
 
-    state[0][statei] = (uint8_t)(combinedValue >> 24); // Extract the first byte
-    state[1][statei] = (uint8_t)(combinedValue >> 16); // Extract the second byte
-    state[2][statei] = (uint8_t)(combinedValue >> 8);  // Extract the third byte
-    state[3][statei] = (uint8_t)combinedValue;         // Extract the fourth byte
+            // Extract the second 8 bits (bits 23-16)
+            uint32_t second8Bits = (hexValue[i+(4*start)] >> 16) & 0xFF;
+
+            // Extract the third 8 bits (bits 15-8)
+            uint32_t third8Bits = (hexValue[i+(4*start)] >> 8) & 0xFF;
+
+            // Extract the last 8 bits (bits 7-0)
+            uint32_t last8Bits = hexValue[i+ (4*start)] & 0xFF;
+            
+            state[0][i] =  state[0][i] ^ first8Bits;
+            state[1][i] =  state[1][i] ^ second8Bits;
+            state[2][i] =  state[2][i] ^ third8Bits;
+            state[3][i] =  state[3][i] ^ last8Bits;
     }
+}
 
 void AESencrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t sbox[256]){
     uint32_t* expandedKey = keyExpansion(RKeys);
     //This will add the original state to the first 4 bytes of the round keys
-    for (int i = 0; i < 4; i++){
-        AddKeyHelper(state, expandedKey, i, i);
-    }
+    AddKeyHelper(state, expandedKey, 0);
     //These will be the 9 round that are described by the AES Encrpytion Algorithm
     for (int i = 1; i < 10; i++){
         SubBytes(state, sbox);
         shiftRows(state);
         MixColumns(state);
-        for (int j = 0; j < 4; j++){
-            AddKeyHelper(state, expandedKey, j, (i*4)+j);
-        }
+        AddKeyHelper(state, expandedKey, i);
     }
     SubBytes(state,sbox);
     shiftRows(state);
-    for (int i = 0; i < 4; i++){
-        AddKeyHelper(state, expandedKey, i, 40+i);
-    }
+    AddKeyHelper(state, expandedKey, 10);
 }
 
-
+// Function to convert a single hex character to an integer
+uint32_t hexCharToInt(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    } else {
+        // Handle invalid input
+        fprintf(stderr, "Invalid hex character: %c\n", c);
+        exit(EXIT_FAILURE);
+    }
+}
 
 int main() {
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
+
+
     char hexInput[33];  // Room for 32 hex characters plus null terminator
     uint8_t state[4][4];
 
@@ -289,17 +307,31 @@ int main() {
         }
     }
 
-    char keyInput[33];  // 32 characters for the 128-bit hex + 1 for null terminator
-    uint32_t result[4];
-     printf("Enter a 128-bit key input (32 characters): ");
-    if (scanf("%32s", keyInput) != 1) {
-        fprintf(stderr, "Error reading input.\n");
-        return 1;
+
+    char inputWord[33]; // 32 characters plus null terminator
+    uint32_t RKeys[4]; // 128-bit unsigned integer array
+
+    // Input the 32-character word
+    printf("Enter a 32-character word (hexadecimal): ");
+    scanf("%32s", inputWord);
+
+    // Check if the input word is exactly 32 characters
+    if (strlen(inputWord) != 32) {
+        fprintf(stderr, "Input word must be exactly 32 characters long.\n");
+        return EXIT_FAILURE;
     }
+
+    // Convert the input word to 128-bit unsigned integers
     for (int i = 0; i < 4; i++) {
-        sscanf(keyInput + i * 8,"%hhx", &result[i]);
+        RKeys[i] = 0;
+        for (int j = 0; j < 8; j++) {
+            RKeys[i] <<= 4;
+            RKeys[i] |= hexCharToInt(inputWord[i * 8 + j]);
+        }
     }
-    AESencrypt(state, result, sbox);
+
+
+    AESencrypt(state, RKeys, sbox);
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 4; i++) {
             printf("%02X", state[i][j]);
