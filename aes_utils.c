@@ -30,3 +30,4 @@ void initialize_aes_sbox(uint8_t sbox[256]) {
 	/* 0 is a special case since it has no inverse */
 	sbox[0] = 0x63;
 }
+

@@ -183,6 +183,8 @@ void printMatrix(uint8_t (*state)[4]){
     }
 }
 
+
+
 //Currently this is used for testing purposes.
 //This will be used to do all encrpytion later on
 void tests() {
@@ -223,11 +225,6 @@ void tests() {
     MixColumns(mixTest);
     printf("MixColumns test:\n");
     printMatrix(mixTest);*/
-    uint32_t ogKey[4] = {0x00010203,0x04050607,0x08090a0b0,0x0c0d0e0f};
-    uint32_t* RKeys = ogKey;
-    uint32_t* expandedKey = keyExpansion(RKeys);
-    printf("Expanded Key:\n");
-    printArray(expandedKey, 4 * R);
 }
 
 void AddKeyHelper(uint8_t state[4][4], uint32_t *hexValue, int start){
@@ -283,6 +280,7 @@ uint32_t hexCharToInt(char c) {
 }
 
 int main() {
+    
     uint8_t sbox[256];
     initialize_aes_sbox(sbox);
 
@@ -337,6 +335,7 @@ int main() {
             printf("%02X", state[i][j]);
         }
     }
+
 
     printf("\n");
 
