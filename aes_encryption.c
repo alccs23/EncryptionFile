@@ -6,6 +6,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "aes_utils.h"
+#include "aes_encryption.h"
 
 // Number of rounds for AES-128
 #define AES_ROUNDS 10
@@ -117,52 +118,6 @@ void printMatrix(uint8_t (*state)[4]){
     }
 }
 
-
-
-//Currently this is used for testing purposes.
-//This will be used to do all encrpytion later on
-void tests() {
-    /*uint8_t sbox[256];
-    initialize_aes_sbox(sbox);
-    uint32_t word = RotWord(0x11223344, 8);
-    uint32_t word2 = SubWord(0x11223344, sbox);
-    printf("RotWord word: 0x%X\n", word);
-    printf("SubWord word: 0x%X\n", word2);
-
-    uint32_t ogKey[4] = {0x00000000, 0x00000000, 0x00000000, 0x00000000};
-    uint32_t* expandedKey = keyExpansion(ogKey);
-    printf("Expanded Key:\n");
-    printArray(expandedKey, 4 * R);
-
-    uint8_t state[4][4] = {
-        {0x01, 0x02, 0x03, 0x04},
-        {0x05, 0x06, 0x07, 0x08},
-        {0x09, 0x0A, 0x0B, 0x0C},
-        {0x0D, 0x0E, 0x0F, 0x10}
-    };
-    AddRoundKey(expandedKey, state);
-    printf("Expanded Key (AddRoundKey):\n");
-    printArray(expandedKey, 4 * R);
-
-    SubBytes(state, sbox);
-    printf("SubBytes States:\n");
-    printMatrix(state);
-    shiftRows(state);
-    printf("ShiftRows States:\n");
-    printMatrix(state);
-    uint8_t mixTest[4][4] = {
-        {0xdb, 0xf2, 0x01, 0x2d},
-        {0x13, 0x0a, 0x01, 0x26},
-        {0x53, 0x22, 0x01, 0x31},
-        {0x45, 0x5c, 0x01, 0x4c}
-    };
-    MixColumns(mixTest);
-    printf("MixColumns test:\n");
-    printMatrix(mixTest);*/
-}
-
-
-
 void AESencrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t sbox[256]){
     uint32_t* expandedKey = keyExpansion(RKeys, sbox);
     //This will add the original state to the first 4 bytes of the round keys
@@ -179,80 +134,6 @@ void AESencrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t sbox[256]){
     AddKeyHelper(state, expandedKey, 10);
 }
 
-// Function to convert a single hex character to an integer
-uint32_t hexCharToInt(char c) {
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    } else if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    } else if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    } else {
-        // Handle invalid input
-        fprintf(stderr, "Invalid hex character: %c\n", c);
-        exit(EXIT_FAILURE);
-    }
-}
-
-int main() {
-    
-    uint8_t sbox[256];
-    initialize_aes_sbox(sbox);
 
 
-    char hexInput[33];  // Room for 32 hex characters plus null terminator
-    uint8_t state[4][4];
 
-    printf("Enter a 128-bit plaintext input (32 characters): ");
-    if (scanf("%32s", hexInput) != 1) {
-        fprintf(stderr, "Error reading input.\n");
-        return 1;
-    }
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            char hexByte[3];
-            hexByte[0] = hexInput[(j * 4 + i) * 2];
-            hexByte[1] = hexInput[(j * 4 + i) * 2 + 1];
-            hexByte[2] = '\0';
-
-            sscanf(hexByte, "%hhx", &state[i][j]);
-        }
-    }
-
-
-    char inputWord[33]; // 32 characters plus null terminator
-    uint32_t RKeys[4]; // 128-bit unsigned integer array
-
-    // Input the 32-character word
-    printf("Enter a 32-character word (hexadecimal): ");
-    scanf("%32s", inputWord);
-
-    // Check if the input word is exactly 32 characters
-    if (strlen(inputWord) != 32) {
-        fprintf(stderr, "Input word must be exactly 32 characters long.\n");
-        return EXIT_FAILURE;
-    }
-
-    // Convert the input word to 128-bit unsigned integers
-    for (int i = 0; i < 4; i++) {
-        RKeys[i] = 0;
-        for (int j = 0; j < 8; j++) {
-            RKeys[i] <<= 4;
-            RKeys[i] |= hexCharToInt(inputWord[i * 8 + j]);
-        }
-    }
-
-
-    AESencrypt(state, RKeys, sbox);
-    for (int j = 0; j < 4; j++) {
-        for (int i = 0; i < 4; i++) {
-            printf("%02X", state[i][j]);
-        }
-    }
-
-
-    printf("\n");
-
-    return 0; // Exit with success
-}

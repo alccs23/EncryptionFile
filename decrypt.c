@@ -6,7 +6,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "aes_utils.h"
-
+#include "aes_encryption.h"
 
 
 
@@ -54,7 +54,7 @@ void invShiftRows(uint8_t state[4][4]) {
 
 /*Adapted version from https://en.wikipedia.org/wiki/Rijndael_MixColumns, since my previous code was wrong for this case, but correct for the other IDK MAN.*/
 // Galois Multiplication of two bytes
-uint8_t GalMul(uint8_t a, uint8_t b) {
+uint8_t GalMul1(uint8_t a, uint8_t b) {
     uint8_t p = 0;
     for (int i = 0; i < 8; i++) {
         if (b & 1) {
@@ -76,8 +76,8 @@ void InvMixColumns(uint8_t state[4][4]) {
 
     for (int c = 0; c < 4; ++c) {
         for (int i = 0; i < 4; ++i) {
-            temp[i][c] = GalMul(state[i][c], 0x0E) ^ GalMul(state[(i + 1) % 4][c], 0x0B) ^
-                         GalMul(state[(i + 2) % 4][c], 0x0D) ^ GalMul(state[(i + 3) % 4][c], 0x09);
+            temp[i][c] = GalMul1(state[i][c], 0x0E) ^ GalMul1(state[(i + 1) % 4][c], 0x0B) ^
+                         GalMul1(state[(i + 2) % 4][c], 0x0D) ^ GalMul1(state[(i + 3) % 4][c], 0x09);
         }
     }
 
@@ -90,16 +90,6 @@ void InvMixColumns(uint8_t state[4][4]) {
 }
 
 
-//Nice helper function to visualize state matrix
-void printMatrix(uint8_t (*state)[4]){
-     for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            // Use %02X to format each element as a two-digit hexadecimal number
-            printf("%02X ", state[i][j]);
-        }
-        printf("\n"); // Start a new line for the next row
-    }
-}
 
 void AESDecrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t inverseSbox[256], uint8_t sbox[256]){
     uint32_t* expandedKey = keyExpansion(RKeys, sbox);
@@ -115,78 +105,6 @@ void AESDecrypt(uint8_t state[4][4], uint32_t* RKeys, uint8_t inverseSbox[256], 
     AddKeyHelper(state, expandedKey, 0);
 }
 
-// Function to convert a single hex character to an integer
-uint32_t hexCharToInt(char c) {
-    if (c >= '0' && c <= '9') {
-        return c - '0';
-    } else if (c >= 'a' && c <= 'f') {
-        return c - 'a' + 10;
-    } else if (c >= 'A' && c <= 'F') {
-        return c - 'A' + 10;
-    } else {
-        // Handle invalid input
-        fprintf(stderr, "Invalid hex character: %c\n", c);
-        exit(EXIT_FAILURE);
-    }
-}
-
-int main() {
-    uint8_t sbox[256];
-    uint8_t inverseSbox[256];
-    initialize_aes_inverse_sbox(inverseSbox);
-    initialize_aes_sbox(sbox);
-
-    char hexInput[33];  // Room for 32 hex characters plus null terminator
-    uint8_t state[4][4];
-
-    printf("Enter a 128-bit Encrypted input (32 characters): ");
-    if (scanf("%32s", hexInput) != 1) {
-        fprintf(stderr, "Error reading input.\n");
-        return 1;
-    }
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            char hexByte[3];
-            hexByte[0] = hexInput[(j * 4 + i) * 2];
-            hexByte[1] = hexInput[(j * 4 + i) * 2 + 1];
-            hexByte[2] = '\0';
-
-            sscanf(hexByte, "%hhx", &state[i][j]);
-        }
-    }
-
-
-    char inputWord[33]; // 32 characters plus null terminator
-    uint32_t RKeys[4]; // 128-bit unsigned integer array
-
-    // Input the 32-character word
-    printf("Enter a 32-character word (hexadecimal): ");
-    scanf("%32s", inputWord);
-
-    // Check if the input word is exactly 32 characters
-    if (strlen(inputWord) != 32) {
-        fprintf(stderr, "Input word must be exactly 32 characters long.\n");
-        return EXIT_FAILURE;
-    }
-
-    // Convert the input word to 128-bit unsigned integers
-    for (int i = 0; i < 4; i++) {
-        RKeys[i] = 0;
-        for (int j = 0; j < 8; j++) {
-            RKeys[i] <<= 4;
-            RKeys[i] |= hexCharToInt(inputWord[i * 8 + j]);
-        }
-    }
-
-
-    AESDecrypt(state, RKeys, inverseSbox, sbox);
-    printMatrix(state);
-
-    printf("\n");
-
-    return 0; // Exit with success
-}
 
 
 

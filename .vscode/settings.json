@@ -2,6 +2,8 @@
     "files.associations": {
         "aes_utils.h": "c",
         "stdint.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "aes_encryption.h": "c",
+        "type_traits": "c"
     }
 }
