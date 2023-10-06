@@ -1,4 +1,4 @@
-# AES Encryption/Decryption Program
+# AES Encryption/Decryption Program (WIP)
 
 This program provides a user-friendly interface for encrypting and decrypting data using the Advanced Encryption Standard (AES-128 specfically) algorithm. It combines a C-based encryption/decryption core with a Python-based graphical user interface (GUI) for ease of use.
 
